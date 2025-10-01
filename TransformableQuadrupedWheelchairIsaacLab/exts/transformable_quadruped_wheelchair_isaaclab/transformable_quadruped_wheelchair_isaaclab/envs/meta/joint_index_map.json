@@ -1,0 +1,18 @@
+{
+  "FL_hip_joint": 1,
+  "FR_hip_joint": 2,
+  "RL_hip_joint": 3,
+  "RR_hip_joint": 4,
+  "FL_thigh_joint": 6,
+  "FR_thigh_joint": 7,
+  "RL_thigh_joint": 8,
+  "RR_thigh_joint": 9,
+  "LFUpper2_joint": 11,
+  "RFUpper2_joint": 12,
+  "LRUpper2_joint": 13,
+  "RRUpper2_joint": 14,
+  "FL_calf_joint": 16,
+  "FR_calf_joint": 18,
+  "RL_calf_joint": 21,
+  "RR_calf_joint": 23
+}

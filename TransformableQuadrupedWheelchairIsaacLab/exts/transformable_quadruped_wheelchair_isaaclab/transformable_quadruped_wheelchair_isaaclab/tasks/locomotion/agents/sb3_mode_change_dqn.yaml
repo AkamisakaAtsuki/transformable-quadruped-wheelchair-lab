@@ -1,0 +1,24 @@
+seed: 0
+n_timesteps: 500000
+policy: "MlpPolicy"
+
+# 基本学習パラメータ
+learning_rate: 0.0005
+batch_size: 64
+gamma: 0.99
+
+# ネットワークの構造（各隠れ層に256ユニット）
+policy_kwargs:
+  net_arch: [256, 256]
+
+# DQN固有のパラメータ
+buffer_size: 1000000         # リプレイバッファのサイズ
+learning_starts: 10000       # 学習開始前に収集するステップ数
+train_freq: 4                # 学習頻度（例：4ステップごとに学習）
+gradient_steps: 1            # 一度の学習での勾配更新回数
+target_update_interval: 1000 # ターゲットネットワークの更新頻度
+
+# 探索パラメータ（epsilon-greedy法の設定）
+exploration_initial_eps: 1.0   # 初期のepsilon値
+exploration_final_eps: 0.05    # 最終的なepsilon値
+exploration_fraction: 0.1      # 総ステップ数に対するepsilon減衰の割合
