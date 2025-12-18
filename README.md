@@ -1,8 +1,6 @@
 # transformable-quadruped-wheelchair-lab
 
-<video controls width="640">
-  <source src="media/journal-2025-video.mp4" type="video/mp4">
-</video>
+![](media/journal-2025-video.mp4)
 
 ## インストール
 ```bash
