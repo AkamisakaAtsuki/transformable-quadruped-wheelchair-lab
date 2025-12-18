@@ -1,27 +1,35 @@
 # transformable-quadruped-wheelchair-lab
 
 ## インストール
+```bash
 git clone https://github.com/AkamisakaAtsuki/transformable-quadruped-wheelchair-lab.git
 cd transformable-quadruped-wheelchair-lab/TransformableQuadrupedWheelchairIsaacLab
 python -m pip install -e exts/transformable_quadruped_wheelchair_isaaclab
+```
 
 車輪モードと歩行モードの強化学習の実施
 ・isaaclabのパッケージ形式
 歩行モードの学習
+```bash
 python IsaacLab\scripts\reinforcement_learning\rsl_rl\train.py --task TQW-Walking-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
-
+```
 車輪モードの学習
+```bash
 python IsaacLab\scripts\reinforcement_learning\rsl_rl\train.py --task TQW-Wheel-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
-
+```
 
 揺れの分析
 ・揺れデータの収集
+```bash
 python run_wheeled_and_walking_policy_collect_teslabot_positions.py
+```
 を実行する。この際、内部では、観測情報をそろえるための前処理などを加えてjit化したもでるが使用されている。
 歩行モードと車輪モードに対して実行する
 
 ・jupyter形式
+```bash
 sway_analysis.ipynb
+```
 を実行
 
 蒸留
@@ -34,5 +42,6 @@ base_student_policy_distillation.ipynbを実行
 
 評価実験
 ・isaaclab
-
+```bash
 python IsaacLab\scripts\reinforcement_learning\rsl_rl\train.py --task TQW-Two-Modes-with-ModeVector-v0 --num_envs 100
+```
