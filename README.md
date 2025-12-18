@@ -9,6 +9,8 @@ Specifically, this repository covers:
 - Integration of walking and wheeled policies into a single unified policy via mode-conditioned policy distillation
 - Evaluation on long-distance navigation tasks with explicit mode switching
 
+https://github.com/user-attachments/assets/c5e4a9cc-27c5-4767-8748-49305b8ebba3
+
 ## Installation
 ```bash
 git clone https://github.com/AkamisakaAtsuki/transformable-quadruped-wheelchair-lab.git
@@ -87,4 +89,5 @@ This evaluation collects metrics such as:
 
 - Travel distance per episode
 - Time to reach the goal
+
 - Goal completion success
