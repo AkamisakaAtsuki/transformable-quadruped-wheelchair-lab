@@ -1,55 +1,90 @@
 # transformable-quadruped-wheelchair-lab
 
-![](media/journal-2025-video.mp4)
+This repository provides research-oriented code to reproduce and evaluate a transformable quadruped wheelchair capable of switching between walking mode and wheeled mode, using large-scale parallel simulations on NVIDIA Isaac Lab.
 
-## インストール
+Specifically, this repository covers:
+
+- Acquisition of locomotion policies for each mode using reinforcement learning (PPO)
+- Frequency-domain analysis of passenger acceleration to compare vibration characteristics
+- Integration of walking and wheeled policies into a single unified policy via mode-conditioned policy distillation
+- Evaluation on long-distance navigation tasks with explicit mode switching
+
+## Installation
 ```bash
 git clone https://github.com/AkamisakaAtsuki/transformable-quadruped-wheelchair-lab.git
 cd transformable-quadruped-wheelchair-lab/TransformableQuadrupedWheelchairIsaacLab
 python -m pip install -e exts/transformable_quadruped_wheelchair_isaaclab
 ```
+Note: NVIDIA Isaac Lab must be installed in advance.
 
-## 車輪モードと歩行モードの強化学習の実施
-### 歩行モードの学習
+## Reinforcement Learning for Walking and Wheeled Modes
+
+In this study, walking mode and wheeled mode are trained independently, as their reference postures and support structures differ significantly.
+
+### Walking Mode Training
 ```bash
 python IsaacLab\scripts\reinforcement_learning\rsl_rl\train.py --task TQW-Walking-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
 ```
 
-### 車輪モードの学習
+### Wheeled Mode Training
 ```bash
 python IsaacLab\scripts\reinforcement_learning\rsl_rl\train.py --task TQW-Wheel-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
 ```
 
-## 揺れの分析
-### データの収集
+## Vibration (Sway) Analysis
+### Data Collection
 ```bash
 python run_wheeled_and_walking_policy_collect_teslabot_positions.py
 ```
-を実行する。この際、内部では、観測情報をそろえるための前処理などを加えてjit化したもでるが使用されている。
-歩行モードと車輪モードに対して実行する
+This script executes both walking and wheeled policies while collecting passenger motion data.
+Internally, JIT-compiled policies with preprocessing steps are used to align observation representations across modes.
 
-### PSD分析
-収集したTeslabotの揺れ情報を以下のスクリプトで分析
+The script should be executed separately for walking mode and wheeled mode.
+
+### PSD Analysis
+The collected Tesla Bot acceleration data are analyzed using the following notebook:
 ```bash
 sway_analysis.ipynb
 ```
+This performs power spectral density (PSD) analysis to compare vibration characteristics between the two modes.
 
-## 両モデルの入出力次元の統一化
-上で学習した歩行モードと車輪モードでは入出力次元数が異なる。しかし、方策蒸留をする上では、入出力次元をそろえたうえでデータ取集をすることが望まれる。そこで、以下のコードを実行して、入出力次元を統一する。
+## Unifying Input/Output Dimensions of Both Policies
+The walking and wheeled policies differ in their input/output dimensions due to different controlled joint sets.
+However, policy distillation requires a unified representation.
+
+The following scripts export JIT-compiled policies with aligned input/output dimensions:
 ```bash
 scripts/export_full_policywk_jit.py 
 scripts/export_full_policywh_jit.py
 ```
 
-## 蒸留向けデータセットの収集
-各モードの学習時に使用した環境クラス内に、データ収集オプションがあり、デフォルトではNoneになっているが、そこをコメントアウトすることで、その環境を実行時にそのデータが収集されるようになる。
+## Dataset Collection for Policy Distillation
 
-## 方策蒸留の実行
+Each environment class used during walking and wheeled training includes an optional data collection mode.
+
+By default, this option is set to None.
+By uncommenting the relevant section, observation–action pairs will be automatically collected during environment execution and stored as a dataset for distillation.
+
+## Policy Distillation
+
+Run the following notebook to perform mode-conditioned policy distillation:
+```bash
 base_student_policy_distillation.ipynb
-を実行
+```
+This integrates walking and wheeled teacher policies into a single student policy conditioned on a mode vector.
 
-## 評価
-isaaclabで評価用の長距離環境を構築している。以下を実行する。各エピソードの移動距離や、かかった時間、ゴールしたかどうか、といった情報を取得できる。
+## Evaluation
+
+A dedicated long-distance evaluation environment with explicit mode switching is implemented in Isaac Lab.
+
+Run the following command to evaluate the distilled policy:
+
 ```bash
 python IsaacLab\scripts\reinforcement_learning\rsl_rl\play.py --task TQW-Two-Modes-with-ModeVector-v0 --num_envs 100
 ```
+
+This evaluation collects metrics such as:
+
+- Travel distance per episode
+- Time to reach the goal
+- Goal completion success
