@@ -6,7 +6,7 @@ import torch.nn as nn
 WALKING_MODE_PREFERRED_ANGLES = {
     'LFUpper2_joint': 0.0, 'RFUpper2_joint': 0.0, 'LRUpper2_joint': 0.0, 'RRUpper2_joint': 0.0, 
     'LFTire1_joint': 0.0, 'RFTire1_joint': 0.0, 'LRTire1_joint': 0.0, 'RRTire1_joint': 0.0, 
-    'FL_hip_joint': 0.2, 'FR_hip_joint': -0.2, 'RL_hip_joint': 0.2, 'RR_hip_joint': -0.2,       # 以下はweakに制約をかけたほうがよさそうな項目
+    'FL_hip_joint': 0.2, 'FR_hip_joint': -0.2, 'RL_hip_joint': 0.2, 'RR_hip_joint': -0.2,       
     'FL_thigh_joint': 0.8, 'FR_thigh_joint': 0.8, 'RL_thigh_joint': 1.0, 'RR_thigh_joint': 1.0, 
     'FL_calf_joint': -1.5, 'FR_calf_joint': -1.5, 'RL_calf_joint': -1.5, 'RR_calf_joint': -1.5, 
 }
@@ -14,7 +14,7 @@ WALKING_MODE_PREFERRED_ANGLES = {
 WHEELED_MODE_PREFERRED_ANGLES = {
     'LFUpper2_joint': 0.0, 'RFUpper2_joint': 0.0, 'LRUpper2_joint': 0.0, 'RRUpper2_joint': 0.0, # 操舵
     # 'LFTire1_joint': 0.0, 'RFTire1_joint': 0.0, 'LRTire1_joint': 0.0, 'RRTire1_joint': 0.0,     # 車輪移動
-    'FL_hip_joint': 0.2, 'FR_hip_joint': -0.2, 'RL_hip_joint': 0.2, 'RR_hip_joint': -0.2,       # 以下はweakに制約をかけたほうがよさそうな項目
+    'FL_hip_joint': 0.2, 'FR_hip_joint': -0.2, 'RL_hip_joint': 0.2, 'RR_hip_joint': -0.2,      
     'FL_thigh_joint': 0.0, 'FR_thigh_joint': 0.0, 'RL_thigh_joint': 0.0, 'RR_thigh_joint': 0.0, 
     'FL_calf_joint': -2.0, 'FR_calf_joint': -2.0, 'RL_calf_joint': -2.0, 'RR_calf_joint': -2.0,
 }
@@ -27,7 +27,7 @@ WALKING_OFFSET = { # 中間のオフセットに対応したバージョン
 }
 
 WHEEL_OFFSET = {
-    'FL_hip_joint': 0.1, 'FR_hip_joint': -0.1, 'RL_hip_joint': 0.1, 'RR_hip_joint': -0.1,       # 以下はweakに制約をかけたほうがよさそうな項目
+    'FL_hip_joint': 0.1, 'FR_hip_joint': -0.1, 'RL_hip_joint': 0.1, 'RR_hip_joint': -0.1,     
     'FL_thigh_joint': 0.0, 'FR_thigh_joint': 0.0, 'RL_thigh_joint': 0.0, 'RR_thigh_joint': 0.0, 
     'LFUpper2_joint': 0.0, 'RFUpper2_joint': 0.0, 'LRUpper2_joint': 0.0, 'RRUpper2_joint': 0.0, # 操舵
     'FL_calf_joint': -2.0, 'FR_calf_joint': -2.0, 'RL_calf_joint': -2.0, 'RR_calf_joint': -2.0,
@@ -54,61 +54,6 @@ def load_joint_meta():
         wheeled_joints_data = json.load(f)
     
     return joint_index_map_data, walking_joints_data, wheeled_joints_data
-
-# class PreprocessPolicyWrapper(nn.Module):
-#     def __init__(self, policy_wk_path, action_s_idx, action_e_idx, restricted_action_dim, full_action_dim, joint_index_map_data, walking_joints_data, WALKING_MODE_PREFERRED_ANGLES, device="cpu"):
-#         super().__init__()
-#         # JITモデルをロード
-#         self.policy_wk = torch.jit.load(policy_wk_path, map_location=device)
-#         self.action_s_idx = action_s_idx
-#         self.action_e_idx = action_e_idx
-#         self.full_action_dim = full_action_dim
-#         self.joint_index_map_data = joint_index_map_data
-#         self.walking_joints_data = walking_joints_data
-#         self.WALKING_MODE_PREFERRED_ANGLES = WALKING_MODE_PREFERRED_ANGLES
-
-#         self.prev_full_action_wk = torch.zeros(
-#             (1, restricted_action_dim), 
-#             dtype=torch.float32, 
-#             device=device
-#         )
-
-#     def forward(self, obs):
-#         # obs: (batch_size, obs_dim)のtensorを想定
-#         # 必要な部分だけ抜き出し
-#         batch_size = obs.shape[0]
-#         _obs = obs.clone()
-#         _obs_before = _obs[:, :self.action_s_idx]
-#         _obs_after  = _obs[:, self.action_e_idx:]
-#         obs_wk = torch.cat([_obs_before, self.prev_full_action_wk, _obs_after], dim=1)
-
-#         # JIT policyへ
-#         _actions_wk = self.policy_wk(obs_wk)
-#         self.prev_full_action_wk = _actions_wk
-
-#         full_actions_wk = torch.zeros(
-#             batch_size, 
-#             self.full_action_dim, 
-#             device=_actions_wk.device
-#         )
-            
-#         for joint_name, target_idx in joint_index_map_data.items():
-#             if joint_name in joint_to_walking_pos:
-#                 pos = joint_to_walking_pos[joint_name]
-#                 full_actions_wk[:, target_idx] = _actions_wk[:, pos] * 0.1 + self.WALKING_OFFSET[joint_name]
-#             else:
-#                 full_actions_wk[:, target_idx] = self.WALKING_MODE_PREFERRED_ANGLES[joint_name]
-        
-        # keep_mask = sorted(joint_index_map_data.values())
-        # reduced_actions_wk = full_actions_wk[:, keep_mask]
-
-        # zeros4 = torch.zeros(batch_size, 4, device=_actions_wk.device)
-        # combined_actions_wk = torch.cat([reduced_actions_wk, zeros4], dim=1)
-
-#         return combined_actions_wk
-
-import torch
-import torch.nn as nn
 
 class PreprocessPolicyWrapper(nn.Module):
     def __init__(
@@ -160,17 +105,7 @@ class PreprocessPolicyWrapper(nn.Module):
             dtype=_actions_wk.dtype,
             device=_actions_wk.device
         )
-        # --- Tensor index-based mapping (JIT-compatible)
-        # walking_action_map: 各full_actionのindexに対応するrestricted_actionのindex, -1ならdefault
-        # for i in range(self.full_action_dim):
-        #     idx = int(self.walking_action_map[i].item())
-        #     if idx >= 0:
-        #         # 学習済みpolicyの出力＋オフセット
-        #         full_actions_wk[:, i] = _actions_wk[:, idx] * 0.1 + self.walking_offsets[i]
-        #     else:
-        #         # preferred angle（デフォルト）
-        #         full_actions_wk[:, i] = self.walking_defaults[i]
-
+        
         full_actions_wk[:, self.walking_offsets_indices] = self.walking_defaults
         full_actions_wk[:, self.walking_action_out_indices] = _actions_wk * 0.1 + self.walking_offsets
 
@@ -227,13 +162,6 @@ walking_defaults = torch.tensor(
     dtype=torch.float
 )
 
-#         for joint_name, target_idx in joint_index_map_data.items():
-#             if joint_name in joint_to_walking_pos:
-#                 pos = joint_to_walking_pos[joint_name]
-#                 full_actions_wk[:, target_idx] = _actions_wk[:, pos] * 0.1 + self.WALKING_OFFSET[joint_name]
-#             else:
-#                 full_actions_wk[:, target_idx] = self.WALKING_MODE_PREFERRED_ANGLES[joint_name]
-
 keep_mask = torch.tensor(sorted(joint_index_map_data.values()), dtype=torch.long)
 
 print(keep_mask)
@@ -258,3 +186,4 @@ wrapper = PreprocessPolicyWrapper(
 scripted_policy = torch.jit.script(wrapper)  # できればscript。traceでもOK
 save_name = trained_jit_policy_full_path[:-3] + "_full.pt"
 torch.jit.save(scripted_policy, save_name)
+
