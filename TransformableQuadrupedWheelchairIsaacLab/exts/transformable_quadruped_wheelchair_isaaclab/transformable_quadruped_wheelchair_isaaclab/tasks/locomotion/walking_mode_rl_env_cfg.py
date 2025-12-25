@@ -17,7 +17,7 @@ class QuadrupedWheelchairWalkingModeRlEnvCfg(BaseQuadrupedWheelchairEnvCfg):
         TRY = True
         if TRY:
             self.scene.terrain.terrain_generator = MODE_CHANGE_TERRAINS_CFG
-            # slopeは平坦にする
+
             self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope"].slope_range = (0, 0)
             self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope_inv"].slope_range = (0, 0)
             self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope_2"].slope_range = (0, 0)

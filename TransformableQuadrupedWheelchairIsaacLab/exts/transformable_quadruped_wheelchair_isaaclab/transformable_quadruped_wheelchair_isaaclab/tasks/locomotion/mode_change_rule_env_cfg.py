@@ -76,12 +76,10 @@ class ChangeModeActionsCfg:
 @configclass
 class CommandsCfg:
     """Command specifications for the MDP."""
-    
-    # 新たにゴール追従用のコマンドを追加
+  
     base_velocity = quadruped_wheelchair_mdp.GoalTrackingCommandCfg(
         asset_name="robot",
         debug_vis=True,
-        # 各カリキュラムにおけるゴール位置（例として下記のテンソルを与える）
         goal_positions=[
             [-36.0,  28.0,  0.1225],
             [-28.0,  28.0,  0.15817],
@@ -94,15 +92,13 @@ class CommandsCfg:
             [ 28.0,  28.0,  0.76092],
             [ 36.0,  28.0,  0.76487]
         ],
-        gain=1.0,        # 差分に対する比例ゲイン（必要に応じて調整）
-        max_speed=1.0,   # 各軸の最大速度（m/s）
+        gain=1.0,
+        max_speed=1.0, 
         resampling_time_range=(0.1, 0.1)
     )
 
 @configclass
 class ChangeModeCurriculumCfg:
-    """Curriculum terms for the MDP."""
-
     terrain_levels = CurrTerm(func=quadruped_wheelchair_mdp.terrain_levels_vel)    
 
 @configclass
@@ -119,11 +115,8 @@ class QuadrupedWheelchairChangeModeRuleEnvCfg(BaseQuadrupedWheelchairEnvCfg):
         self.episode_length_s = 5
         print(f"self.episode_length_s: {self.episode_length_s}")
 
-        # 変形モードではトルクが足りなくなってしまって立ち上がれないことがあるため50kgで統一するのはどうか？
-        # self.events.add_teslabot_mass.params["mass_distribution_params"] = (-0.1, 0.1) # Noneはせずランダム範囲を小さく狭める
-
         self.scene.terrain.terrain_generator = MODE_CHANGE_TERRAINS_CFG
-        # slopeは平坦にする
+      
         self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope"].slope_range = (0, 0)
         self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope_inv"].slope_range = (0, 0)
         self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope_2"].slope_range = (0, 0)
@@ -137,8 +130,7 @@ class QuadrupedWheelchairChangeModeRuleEnvCfg(BaseQuadrupedWheelchairEnvCfg):
         self.events.reset_base.params["pose_range"]["yaw"] = (math.pi/2, math.pi/2)
 
         DEBUG_WALKING_MODE = None
-
-        # 歩行モード実行時に常時、固定しておく関節
+        
         self.events.apply_walking_policy.params["joint_pos_to_fix"] = {
             'ChairArm_joint': 0.0,  
             'SittingChairAngle_joint': 0.0, 
@@ -187,7 +179,6 @@ class QuadrupedWheelchairChangeModeRuleEnvCfg(BaseQuadrupedWheelchairEnvCfg):
             "height_scan": 187,
         }
 
-        # 歩行モード時の終了判定
         self.terminations.base_contact.params["sensor_cfg"].body_names = [
             # "base", 
             ".*_thigh", 
@@ -209,9 +200,6 @@ class QuadrupedWheelchairChangeModeRuleEnvCfg(BaseQuadrupedWheelchairEnvCfg):
             # 'teslabot',
         ]
 
-        # 車輪モードの設定 >>>
-        # 車輪モード時に固定しておくパーツ
-
         self.events.four_wheel_independent_steering.params["joint_offsets"] = {
             'FL_hip_joint': 0.1,
             'FR_hip_joint': -0.1,
@@ -225,69 +213,18 @@ class QuadrupedWheelchairChangeModeRuleEnvCfg(BaseQuadrupedWheelchairEnvCfg):
         
         self.events.four_wheel_independent_steering.params["use_learned_model"] = True
 
-        self.scene.robot.init_state.joint_pos['slider_joint'] = 0.325 # 歩行移動を学習したときのオフセットに設定する！（こうしないとうまくいかない）
+        self.scene.robot.init_state.joint_pos['slider_joint'] = 0.325 
         print(f"[DEBUG] scene.robot.init_state.joint_pos: {self.scene.robot.init_state.joint_pos}")
-
-        # <<<
 
         if DEBUG_WALKING_MODE == True: # True
             self.events.four_wheel_independent_steering = None
             self.events.apply_walking_policy.params["debug_mode"] = True
 
-            # 歩行モードの場合
-            # 関節の初期オフセットを設定
-            # self.scene.robot.init_state.joint_pos = { # 歩行移動を学習したときのオフセットに設定する！（こうしないとうまくいかない）
-            #     ".*L_hip_joint": 0.1,
-            #     ".*R_hip_joint": -0.1,
-            #     "F[L,R]_thigh_joint": 0.8,
-            #     "R[L,R]_thigh_joint": 1.0,
-            #     ".*_calf_joint": -1.5,
-            #     'slider_joint': 0.325,
-            # }
-            # self.scene.robot.init_state.joint_pos['slider_joint'] = 0.325
-            
-            # self.events.four_wheel_independent_steering = None # 車輪モードを無効化
             self.events.apply_walking_policy.params["debug_mode"] = True
 
-            # if self.collect_observation == True:
-            #     # self.scene.terrain.terrain_generator.sub_terrains = {
-            #     #     "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
-            #     #         proportion=0.1, slope_range=(0.0, 0.4), platform_width=2.0, border_width=0.25
-            #     #     ),
-            #     #     "hf_pyramid_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
-            #     #         proportion=0.1, slope_range=(0.0, 0.4), platform_width=2.0, border_width=0.25
-            #     #     )
-            #     # }
-
-            #     self.scene.terrain.terrain_generator.sub_terrains = {
-            #         "pyramid_stairs": terrain_gen.MeshPyramidStairsTerrainCfg(
-            #             proportion=0.2,
-            #             step_height_range=(0.01, 0.23),
-            #             step_width=0.3,
-            #             platform_width=3.0,
-            #             border_width=1.0,
-            #             holes=False,
-            #         ),
-            #         "pyramid_stairs_inv": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
-            #             proportion=0.2,
-            #             step_height_range=(0.01, 0.23),
-            #             step_width=0.3,
-            #             platform_width=3.0,
-            #             border_width=1.0,
-            #             holes=False,
-            #         ),
-            #         "boxes": terrain_gen.MeshRandomGridTerrainCfg(
-            #             proportion=0.2, grid_width=0.45, grid_height_range=(0.01, 0.2), platform_width=2.0
-            #         ),
-            #         "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
-            #             proportion=0.2, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25
-            #         ),
-            #     }
-
         elif DEBUG_WALKING_MODE == False: # False
-            # 車輪モードの場合
-            # 関節の初期オフセットを設定
-            self.scene.robot.init_state.joint_pos = { # 車輪移動を学習したときのオフセットに設定する！（こうしないとうまくいかない）
+          
+            self.scene.robot.init_state.joint_pos = {
                 ".*L_hip_joint": 0.1,
                 ".*R_hip_joint": -0.1,
                 "F[L,R]_thigh_joint": 0.0,
@@ -308,40 +245,6 @@ class QuadrupedWheelchairChangeModeRuleEnvCfg(BaseQuadrupedWheelchairEnvCfg):
                 )
             }
 
-            # if self.collect_observation == True:
-            #     # self.scene.terrain.terrain_generator.sub_terrains = {
-            #     #     "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
-            #     #         proportion=0.1, slope_range=(0.0, 0.4), platform_width=2.0, border_width=0.25
-            #     #     ),
-            #     #     "hf_pyramid_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
-            #     #         proportion=0.1, slope_range=(0.0, 0.4), platform_width=2.0, border_width=0.25
-            #     #     )
-            #     # }
-
-            #     self.scene.terrain.terrain_generator.sub_terrains = {
-            #         "pyramid_stairs": terrain_gen.MeshPyramidStairsTerrainCfg(
-            #             proportion=0.2,
-            #             step_height_range=(0.01, 0.23),
-            #             step_width=0.3,
-            #             platform_width=3.0,
-            #             border_width=1.0,
-            #             holes=False,
-            #         ),
-            #         "pyramid_stairs_inv": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
-            #             proportion=0.2,
-            #             step_height_range=(0.01, 0.23),
-            #             step_width=0.3,
-            #             platform_width=3.0,
-            #             border_width=1.0,
-            #             holes=False,
-            #         ),
-            #         "boxes": terrain_gen.MeshRandomGridTerrainCfg(
-            #             proportion=0.2, grid_width=0.45, grid_height_range=(0.01, 0.2), platform_width=2.0
-            #         ),
-            #         "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
-            #             proportion=0.2, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25
-            #         ),
-            #     }
         else:
             pass
 

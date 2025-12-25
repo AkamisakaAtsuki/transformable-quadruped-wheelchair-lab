@@ -22,10 +22,6 @@ from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import Lo
 import transformable_quadruped_wheelchair_isaaclab.tasks.locomotion.mdp as quadruped_wheelchair_mdp
 import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
 
-##
-# Pre-defined configs
-##
-
 from transformable_quadruped_wheelchair_isaaclab.assets.config.quadruped_wheelchair import Quadruped_Wheelchair_CFG  # isort: skip
 
 @configclass
@@ -164,8 +160,7 @@ class BaseQuadrupedWheelchairEventCfg(EventCfg):
 
 @configclass
 class BaseQuadrupedWheelchairActionCfg:
-    # ほとんどの環境で共通するジョイント位置アクション。
-    # 各モードで異なる設定が必要な場合は、サブクラスで上書き・拡張してください。
+  
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
         joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],

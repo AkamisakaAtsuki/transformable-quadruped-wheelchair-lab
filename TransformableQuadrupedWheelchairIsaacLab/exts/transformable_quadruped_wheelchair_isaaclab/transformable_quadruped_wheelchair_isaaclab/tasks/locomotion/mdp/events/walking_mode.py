@@ -50,30 +50,16 @@ def apply_walking_policy(
     mode_num: float = None, # モードフラグを使用する場合に検出するフラグとなる数字は何かを指定
     debug_mode: bool = False,
 ):
-    """
-    学習済み方策を使用してロボットを制御する関数。
 
-    Args:
-        env (ManagerBasedEnv): 環境インスタンス。
-        env_ids (torch.Tensor): 環境IDのリスト。
-        asset_cfg (SceneEntityCfg): アセット設定。
-        policy_path (str): 学習済み方策ファイルへのパス。
-
-    Returns:
-        None
-    """
     s_time = time.time()
 
     global previous_actions_walking_mode, actions_change_mode, walking_mode_policy, device, INIT_FLAG
-
-    # print(get_mode())
 
     _stop = get_stop()
     if debug_mode==False and use_mode_flag==True:
         _mode = get_mode()
         valid_env_ids = torch.where(_mode == mode_num)[0]
-        # print(valid_env_ids)
-        # モードはtorch.tensorの形であり、_modeの中の値がmode_numとなっている部分のインデックスのリストを取得（torch.tensor型で）
+       
     else:
         valid_env_ids = env_ids
     
@@ -83,29 +69,18 @@ def apply_walking_policy(
         
     INIT_FLAG = False
 
-    # env.scene["robot"].init_state.joint_pos = { # 歩行移動を学習したときのオフセットに設定する！（こうしないとうまくいかない）
-    #             ".*L_hip_joint": 0.1,
-    #             ".*R_hip_joint": -0.1,
-    #             "F[L,R]_thigh_joint": 0.8,
-    #             "R[L,R]_thigh_joint": 1.0,
-    #             ".*_calf_joint": -1.5,
-    #             'slider_joint': 0.325,
-    #         }
+   
     
     if len(valid_env_ids) == 0:
         return
 
-    # asset: Articulation = env.scene[asset_cfg.name]
-    # print(f"asset.data.default_joint_pos: {asset.data.default_joint_pos}")
-    # print(f"asset.data.default_root_state: {asset.data.default_root_state}")
 
-    # ✅ 観測データを取得
     try:
         observations = env.observation_manager.compute()
         current_observations = torch.tensor(
             observations['policy'], dtype=torch.float32, device=device
         ).clone().detach()
-        # print(f"[INFO] Observations shape: {current_observations.shape}")
+      
     except Exception as e:
         print(f"[Error] Failed to get observations: {e}")
         return
@@ -122,9 +97,7 @@ def apply_walking_policy(
                 previous_actions_walking_mode,  # (12,) の actions
                 current_observations[:, action_end_idx:]  # actions 以降
             ], dim=1)
-            # print(current_observations[0, :action_start_idx+12])
-            # current_observations[:, sum([3, 3, 3, 3])-1] = 0 # velocityコマンドのyawは0にする
-            # print(f"[INFO] Actions replaced without affecting height_scan. New shape: {current_observations.shape}")
+            
         else:
             print(f"[Error] Unexpected observation shape: {current_observations.shape}")
             return
@@ -132,7 +105,6 @@ def apply_walking_policy(
         print(f"[Error] Failed to adjust observations: {e}")
         return
 
-    # ✅ 方策からアクションを取得
     try:
         with torch.no_grad():
             actions = walking_mode_policy(current_observations).to(device) 
@@ -141,10 +113,8 @@ def apply_walking_policy(
         print(f"[Error] Failed to infer actions from policy: {e}")
         return
 
-    # ✅ アクションを記録（次回の入力に使用）
     previous_actions_walking_mode[valid_env_ids] = actions[valid_env_ids].clone().detach()
     
-    # ✅ 各ジョイントのオフセットを直接指定（歩行を学習したときに使用したものを設定する）
     joint_offsets = {
         "FL_hip_joint": 0.1,
         "FR_hip_joint": -0.1,
@@ -163,7 +133,6 @@ def apply_walking_policy(
     asset: Articulation = env.scene[asset_cfg.name]
     joint_names = asset.joint_names
 
-    # ✅ ジョイントへのアクションマッピング
     target_joint_names = [
         "FL_hip_joint", "FR_hip_joint", "RL_hip_joint", "RR_hip_joint",
         "FL_thigh_joint", "FR_thigh_joint", "RL_thigh_joint", "RR_thigh_joint",
@@ -174,11 +143,10 @@ def apply_walking_policy(
         if joint_name in joint_names:
             joint_index = joint_names.index(joint_name)
             
-            # ✅ 事前定義されたオフセットを適用
             offset = joint_offsets.get(joint_name, 0.0)
 
-            if validate_env_and_joint_ids(valid_env_ids, torch.tensor([joint_index])):  # 起動初期は数が合わないことがあるのでチェック（もっとちゃんとしたやり方があるはずだが.tmpなやり方です）
-                # ✅ オフセットを考慮したアクションを適用
+            if validate_env_and_joint_ids(valid_env_ids, torch.tensor([joint_index])):
+                
                 adjusted_action = actions[valid_env_ids, i].unsqueeze(-1) * walking_mode_policy_action_scale + offset
                 asset.set_joint_position_target(
                     target=adjusted_action,
@@ -186,7 +154,6 @@ def apply_walking_policy(
                     env_ids=valid_env_ids
                 )
         
-    # 固定しなければならないジョイントがあるなら固定
     if joint_pos_to_fix:
         set_joint_angles(env, valid_env_ids, asset_cfg, joint_pos_to_fix)
 
@@ -199,10 +166,9 @@ def walking_mode_manager(
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    # joint_pos_to_fix: Dict[str, float] = None,
-    # observation_info: Dict[str, float] = None,
-    use_mode_flag: bool = False, # モードフラグを使用するか
-    mode_num: float = None, # モードフラグを使用する場合に検出するフラグとなる数字は何かを指定
+  
+    use_mode_flag: bool = False,
+    mode_num: float = None,
     debug_mode: bool = False,
 ):
 
@@ -216,8 +182,7 @@ def walking_mode_manager(
     if debug_mode==False and use_mode_flag==True:
         _mode = get_mode()
         valid_env_ids = torch.where(_mode == mode_num)[0]
-        # print(valid_env_ids)
-        # モードはtorch.tensorの形であり、_modeの中の値がmode_numとなっている部分のインデックスのリストを取得（torch.tensor型で）
+       
     else:
         valid_env_ids = env_ids
     
@@ -237,111 +202,3 @@ def walking_mode_manager(
         target=action_raw * walking_mode_policy_action_scale,
         env_ids=valid_env_ids
     )
-
-
-    # target_joint_names = [
-    #     "FL_hip_joint", "FR_hip_joint", "RL_hip_joint", "RR_hip_joint",
-    #     "FL_thigh_joint", "FR_thigh_joint", "RL_thigh_joint", "RR_thigh_joint",
-    #     "FL_calf_joint", "FR_calf_joint", "RL_calf_joint", "RR_calf_joint"
-    # ]
-
-
-    # # ✅ 観測データを取得
-    # try:
-    #     observations = env.observation_manager.compute()
-    #     current_observations = torch.tensor(
-    #         observations['policy'], dtype=torch.float32, device=device
-    #     ).clone().detach()
-    #     # print(f"[INFO] Observations shape: {current_observations.shape}")
-    # except Exception as e:
-    #     print(f"[Error] Failed to get observations: {e}")
-    #     return
-
-    # try:
-    #     if current_observations.shape[1] == 244:
-    #         # actions (Index 6) を置き換え
-    #         action_start_idx = sum([3, 3, 3, 3, 16, 28])  # actions の開始インデックス (上記表から計算)
-    #         action_end_idx = action_start_idx + 1  # 現在の actions は (1,)
-
-    #         # actions 部分を上書きせず、新しいカラムを挿入
-    #         current_observations = torch.cat([
-    #             current_observations[:, :action_start_idx],  # actions手前まで
-    #             previous_actions_walking_mode,  # (12,) の actions
-    #             current_observations[:, action_end_idx:]  # actions 以降
-    #         ], dim=1)
-    #         # print(current_observations[0, :action_start_idx+12])
-    #         # current_observations[:, sum([3, 3, 3, 3])-1] = 0 # velocityコマンドのyawは0にする
-    #         # print(f"[INFO] Actions replaced without affecting height_scan. New shape: {current_observations.shape}")
-    #     else:
-    #         print(f"[Error] Unexpected observation shape: {current_observations.shape}")
-    #         return
-    # except Exception as e:
-    #     print(f"[Error] Failed to adjust observations: {e}")
-    #     return
-
-    # # ✅ 方策からアクションを取得
-    # try:
-    #     with torch.no_grad():
-    #         actions = walking_mode_policy(current_observations).to(device) 
-    #         # print(f"[INFO] Actions from policy: {actions.shape}")
-    # except Exception as e:
-    #     print(f"[Error] Failed to infer actions from policy: {e}")
-    #     return
-
-    # # ✅ アクションを記録（次回の入力に使用）
-    # previous_actions_walking_mode[valid_env_ids] = actions[valid_env_ids].clone().detach()
-    
-
-
-
-
-    # # ✅ 各ジョイントのオフセットを直接指定（歩行を学習したときに使用したものを設定する）
-    # joint_offsets = {
-    #     "FL_hip_joint": 0.1,
-    #     "FR_hip_joint": -0.1,
-    #     "RL_hip_joint": 0.1,
-    #     "RR_hip_joint": -0.1,
-    #     "FL_thigh_joint": 0.8,
-    #     "FR_thigh_joint": 0.8,
-    #     "RL_thigh_joint": 1.0,
-    #     "RR_thigh_joint": 1.0,
-    #     "FL_calf_joint": -1.5,
-    #     "FR_calf_joint": -1.5,
-    #     "RL_calf_joint": -1.5,
-    #     "RR_calf_joint": -1.5,
-    # }
-
-    # asset: Articulation = env.scene[asset_cfg.name]
-    # joint_names = asset.joint_names
-
-    # # ✅ ジョイントへのアクションマッピング
-    # target_joint_names = [
-    #     "FL_hip_joint", "FR_hip_joint", "RL_hip_joint", "RR_hip_joint",
-    #     "FL_thigh_joint", "FR_thigh_joint", "RL_thigh_joint", "RR_thigh_joint",
-    #     "FL_calf_joint", "FR_calf_joint", "RL_calf_joint", "RR_calf_joint"
-    # ]
-
-    # for i, joint_name in enumerate(target_joint_names):
-    #     if joint_name in joint_names:
-    #         joint_index = joint_names.index(joint_name)
-            
-    #         # ✅ 事前定義されたオフセットを適用
-    #         offset = joint_offsets.get(joint_name, 0.0)
-
-    #         if validate_env_and_joint_ids(valid_env_ids, torch.tensor([joint_index])):  # 起動初期は数が合わないことがあるのでチェック（もっとちゃんとしたやり方があるはずだが.tmpなやり方です）
-    #             # ✅ オフセットを考慮したアクションを適用
-    #             adjusted_action = actions[valid_env_ids, i].unsqueeze(-1) * walking_mode_policy_action_scale + offset
-    #             asset.set_joint_position_target(
-    #                 target=adjusted_action,
-    #                 joint_ids=joint_index,
-    #                 env_ids=valid_env_ids
-    #             )
-        
-    # # 固定しなければならないジョイントがあるなら固定
-    # if joint_pos_to_fix:
-    #     set_joint_angles(env, valid_env_ids, asset_cfg, joint_pos_to_fix)
-
-    # e_time = time.time()
-
-    # if debug_mode:
-    #     print(f"[INFO] (apply_learned_policy) Time Delta: {e_time - s_time}")

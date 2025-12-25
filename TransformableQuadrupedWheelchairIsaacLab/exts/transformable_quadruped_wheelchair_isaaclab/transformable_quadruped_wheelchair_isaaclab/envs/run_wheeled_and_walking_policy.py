@@ -3,15 +3,9 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to play a checkpoint if an RL agent from RSL-RL."""
-
-"""Launch Isaac Sim Simulator first."""
-
 import argparse
 
 from isaaclab.app import AppLauncher
-
-# add argparse arguments
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
@@ -26,19 +20,14 @@ parser.add_argument(
     help="Use the pre-trained checkpoint from Nucleus.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
-# append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.task = "TQW-Two-Modes-Normal-v0"
-# always enable cameras to record video
 if args_cli.video:
     args_cli.enable_cameras = True
 
-# launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
-
-"""Rest everything follows."""
 
 import os
 import time
@@ -56,14 +45,6 @@ from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.assets import retrieve_file_path
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
-
-# from isaaclab_rl.rsl_rl import (
-#     RslRlOnPolicyRunnerCfg,
-#     RslRlOnPolicyRunner,
-#     RslRlVecEnvWrapper,
-#     export_policy_as_jit, 
-#     export_policy_as_onnx,
-# )
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
@@ -110,36 +91,23 @@ def load_joint_meta():
     
     return joint_index_map_data, walking_joints_data, wheeled_joints_data
 
-# ------------- ブレンド設定 -------------
-dwell_time = 5.0    # 各モード（A, B）を純粋に維持する時間（秒）
-blend_time = 3.0    # モード切り替え時にブレンドする時間（秒）
-cycle_time = 2 * dwell_time + 2 * blend_time  # =16秒
+dwell_time = 5.0  
+blend_time = 3.0  
+cycle_time = 2 * dwell_time + 2 * blend_time 
 
 def compute_mu(cycle_pos: float) -> float:
     global dwell_time, blend_time, cycle_time
-    """
-    cycle_pos が [0, cycle_time) の範囲で与えられている前提。
-    「A(5s) -> blend A->B(3s) -> B(5s) -> blend B->A(3s)」を線形に補完して μ を返す
-    μ=1 なら pure A (combined_actions_wk)、μ=0 なら pure B (combined_actions_wh)
-    """
-    # ① [0, dwell_time): 純粋に A (μ=1)
+   
     if cycle_pos < dwell_time:
         return 1.0
 
-    # ② [dwell_time, dwell_time + blend_time): A->B ブレンド区間
     if cycle_pos < dwell_time + blend_time:
         t_rel = cycle_pos - dwell_time  # 0 <= t_rel < blend_time
-        # 線形: t_rel=0 → μ=1, t_rel=blend_time → μ=0
         return 1.0 - (t_rel / blend_time)
 
-    # ③ [dwell_time+blend_time, dwell_time+blend_time+dwell_time): 純粋に B (μ=0)
     if cycle_pos < 2 * dwell_time + blend_time:
         return 0.0
-
-    # ④ [2*dwell_time + blend_time, cycle_time): B->A ブレンド区間
-    #    cycle_pos はここで 2*dwell_time+blend_time <= cycle_pos < cycle_time
     t_rel = cycle_pos - (2 * dwell_time + blend_time)  # 0 <= t_rel < blend_time
-    # 線形: t_rel=0 → μ=0, t_rel=blend_time → μ=1
     return t_rel / blend_time
 
 def handle_terminated_envs(
@@ -147,16 +115,13 @@ def handle_terminated_envs(
     reward_sums, recent_returns,
     obs
 ):
-    # 1) numpy 化
     done_mask = (terminateds | truncateds).cpu().numpy()
     reward_sums += rewards.cpu().numpy()
 
-    # 2) 終了 env ごとにリターン処理
     for idx in np.nonzero(done_mask)[0]:
         ep = reward_sums[idx]
         recent_returns.append(ep)
 
-        # --- nan/inf + |r|>20 を除いて平均計算 ---
         filtered = [r for r in recent_returns if np.isfinite(r) and abs(r) <= 20]
         count = len(filtered)
         if count > 0:
@@ -192,110 +157,6 @@ def main(policy_wk, policy_wh):
         cfg=env_cfg, 
         render_mode="rgb_array" if args_cli.video else None
     )
-
-    # env = MultiEnvDistillWrapper(env, save_dir="rollouts", base_filename="distill")
-
-    """
-    action_s_idx, action_e_idx = 68, 88  # envから得られるのは20個の要素を持つaction
-
-    default_action_wk = [  # walking modeのdefault action
-        0.0
-        for joint_name in joint_index_map_data.keys()
-        if joint_name in WALKING_ACTION_JOINTS_POS
-    ]
-    default_action_wk_1env = torch.tensor(default_action_wk, dtype=torch.float32, device=device)
-    
-    default_action_wh = [  # wheeled modeのdefault action
-        0.0
-        for joint_name in joint_index_map_data.keys()
-        if joint_name in WHEELED_ACTION_JOINTS_POS
-    ] + [0.0] * len(DEFAULT_ACTION_JOINTS_VEL)
-    default_action_wh_1env = torch.tensor(default_action_wh, dtype=torch.float32, device=device)
-
-    obs, _ = env.reset()
-    batch_size = obs['policy'].shape[0]
-    prev_full_action_wk = default_action_wk_1env.unsqueeze(0).expand(batch_size, -1).clone()
-    prev_full_action_wh = default_action_wh_1env.unsqueeze(0).expand(batch_size, -1).clone()
-
-    start_time = time.time()
-
-    while simulation_app.is_running():
-        _obs = obs['policy'].clone()  # shape: (batch_size, obs_dim)
-
-        _obs_before = _obs[:, :action_s_idx]
-        _obs_after = _obs[:, action_e_idx:]
-        obs_wk = torch.cat([_obs_before, prev_full_action_wk, _obs_after], dim=1)
-        obs_wh = torch.cat([_obs_before, prev_full_action_wh, _obs_after], dim=1)
-
-        with torch.inference_mode():
-            _actions_wk = policy_wk(obs_wk) 
-            _actions_wh = policy_wh(obs_wh) 
-            prev_full_action_wk = _actions_wk
-            prev_full_action_wh = _actions_wh
-            
-            batch_size = _actions_wk.shape[0]
-            full_actions_wk = torch.zeros(batch_size, 28, device=_actions_wk.device)
-            full_actions_wh = torch.zeros(batch_size, 28, device=_actions_wh.device)
-
-            walking_joints_data = sorted(
-                walking_joints_data,
-                key=lambda name: joint_index_map_data[name]
-            )
-            wheeled_joints_data = sorted(
-                wheeled_joints_data,
-                key=lambda name: joint_index_map_data[name]
-            )
-
-            joint_to_walking_pos = { name: i for i, name in enumerate(walking_joints_data) }
-            joint_to_wheeled_pos = { name: i for i, name in enumerate(wheeled_joints_data) }
-
-            for joint_name, target_idx in joint_index_map_data.items():
-                if joint_name in joint_to_walking_pos:
-                    pos = joint_to_walking_pos[joint_name]
-                    full_actions_wk[:, target_idx] = _actions_wk[:, pos] * 0.1 + WALKING_OFFSET[joint_name]
-                else:
-                    full_actions_wk[:, target_idx] = WALKING_MODE_PREFERRED_ANGLES[joint_name]
-
-                if joint_name in joint_to_wheeled_pos:
-                    pos = joint_to_wheeled_pos[joint_name]
-                    full_actions_wh[:, target_idx] = _actions_wh[:, pos] * 0.01 + WHEEL_OFFSET[joint_name]
-                else:
-                    full_actions_wh[:, target_idx] = WHEELED_MODE_PREFERRED_ANGLES[joint_name]
-
-            keep_mask = sorted(joint_index_map_data.values())
-            reduced_actions_wk = full_actions_wk[:, keep_mask]
-            reduced_actions_wh = full_actions_wh[:, keep_mask]
-
-            zeros4 = torch.zeros(batch_size, 4, device=_actions_wk.device)
-            combined_actions_wk = torch.cat([reduced_actions_wk, zeros4], dim=1)
-            combined_actions_wh = torch.cat([reduced_actions_wh, _actions_wh[:, -4:]], dim=1)
-
-
-            
-
-            # ── ここから「5秒おきにセレクト」ロジック ──
-            elapsed = time.time() - start_time
-
-            cycle_pos = elapsed % cycle_time
-
-            mu = compute_mu(cycle_pos)
-
-            # actions = mu * combined_actions_wk + (1.0 - mu) * combined_actions_wh
-            actions = combined_actions_wh
-
-
-
-            # # int(elapsed)//5 が偶数なら walking、奇数なら wheeled
-            # if ((int(elapsed) // 5) % 2) == 0:
-            #     actions = combined_actions_wk 
-            # else:                             
-            #     actions = combined_actions_wh 
-
-
-            # actions = combined_actions_wk
-            obs, _, _, _, _ = env.step(actions)
-        
-    """
 
     recent_returns = deque(maxlen=100)
     reward_sums = np.zeros(env_cfg.scene.num_envs, dtype=np.float32)

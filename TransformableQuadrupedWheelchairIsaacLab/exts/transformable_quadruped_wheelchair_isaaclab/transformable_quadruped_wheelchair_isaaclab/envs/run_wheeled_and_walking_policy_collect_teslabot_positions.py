@@ -3,15 +3,10 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to play a checkpoint if an RL agent from RSL-RL."""
-
-"""Launch Isaac Sim Simulator first."""
-
 import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
@@ -26,19 +21,14 @@ parser.add_argument(
     help="Use the pre-trained checkpoint from Nucleus.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
-# append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.task = "TQW-Two-Modes-Normal-v0"
-# always enable cameras to record video
 if args_cli.video:
     args_cli.enable_cameras = True
 
-# launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
-
-"""Rest everything follows."""
 
 import os
 import csv
@@ -57,14 +47,6 @@ from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.assets import retrieve_file_path
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
-
-# from isaaclab_rl.rsl_rl import (
-#     RslRlOnPolicyRunnerCfg,
-#     RslRlOnPolicyRunner,
-#     RslRlVecEnvWrapper,
-#     export_policy_as_jit, 
-#     export_policy_as_onnx,
-# )
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
@@ -111,36 +93,23 @@ def load_joint_meta():
     
     return joint_index_map_data, walking_joints_data, wheeled_joints_data
 
-# ------------- ブレンド設定 -------------
 dwell_time = 5.0    # 各モード（A, B）を純粋に維持する時間（秒）
 blend_time = 3.0    # モード切り替え時にブレンドする時間（秒）
 cycle_time = 2 * dwell_time + 2 * blend_time  # =16秒
 
 def compute_mu(cycle_pos: float) -> float:
     global dwell_time, blend_time, cycle_time
-    """
-    cycle_pos が [0, cycle_time) の範囲で与えられている前提。
-    「A(5s) -> blend A->B(3s) -> B(5s) -> blend B->A(3s)」を線形に補完して μ を返す
-    μ=1 なら pure A (combined_actions_wk)、μ=0 なら pure B (combined_actions_wh)
-    """
-    # ① [0, dwell_time): 純粋に A (μ=1)
     if cycle_pos < dwell_time:
         return 1.0
 
-    # ② [dwell_time, dwell_time + blend_time): A->B ブレンド区間
     if cycle_pos < dwell_time + blend_time:
         t_rel = cycle_pos - dwell_time  # 0 <= t_rel < blend_time
-        # 線形: t_rel=0 → μ=1, t_rel=blend_time → μ=0
         return 1.0 - (t_rel / blend_time)
 
-    # ③ [dwell_time+blend_time, dwell_time+blend_time+dwell_time): 純粋に B (μ=0)
     if cycle_pos < 2 * dwell_time + blend_time:
         return 0.0
 
-    # ④ [2*dwell_time + blend_time, cycle_time): B->A ブレンド区間
-    #    cycle_pos はここで 2*dwell_time+blend_time <= cycle_pos < cycle_time
     t_rel = cycle_pos - (2 * dwell_time + blend_time)  # 0 <= t_rel < blend_time
-    # 線形: t_rel=0 → μ=0, t_rel=blend_time → μ=1
     return t_rel / blend_time
 
 def handle_terminated_envs(
@@ -148,16 +117,11 @@ def handle_terminated_envs(
     reward_sums, recent_returns,
     obs
 ):
-    # 1) numpy 化
     done_mask = (terminateds | truncateds).cpu().numpy()
     reward_sums += rewards.cpu().numpy()
-
-    # 2) 終了 env ごとにリターン処理
     for idx in np.nonzero(done_mask)[0]:
         ep = reward_sums[idx]
         recent_returns.append(ep)
-
-        # --- nan/inf + |r|>20 を除いて平均計算 ---
         filtered = [r for r in recent_returns if np.isfinite(r) and abs(r) <= 20]
         count = len(filtered)
         if count > 0:
@@ -206,7 +170,6 @@ def main(policy_wk, policy_wh):
     robot_art      = scene["robot"]
     TESLABOT_IDX   = robot_art.body_names.index("teslabot")
 
-    # サンプリング周期
     if hasattr(env.unwrapped, "step_dt"):
         sample_dt = env.unwrapped.step_dt
     else:
@@ -224,9 +187,6 @@ def main(policy_wk, policy_wh):
     while simulation_app.is_running():
         with torch.inference_mode():
             actions = policy_wk(obs['policy']) 
-            # actions = merged_policy(obs['policy']) 
-
-            # 2. 位置を取得してログに追加（まだ finished でない env だけ）
             sim_time = step_counter * sample_dt
             pos_all = robot_art.data.body_pos_w[:, TESLABOT_IDX, :]
             for env_id, pos in enumerate(pos_all):
@@ -236,11 +196,9 @@ def main(policy_wk, policy_wh):
                         pos[0].item(), pos[1].item(), pos[2].item()]
                     )
 
-            # 3) ステップ
             obs, r, term, trunc, infos = env.step(actions)
-            step_counter += 1                         # ★ 忘れずに
+            step_counter += 1                        
 
-            # 4) done 判定
             done_mask = (term | trunc).cpu().numpy()
             for idx in np.nonzero(done_mask)[0]:
                 if idx not in finished_envs:
@@ -251,13 +209,8 @@ def main(policy_wk, policy_wh):
             if len(finished_envs) == num_envs:
                 print("[INFO] All environments finished — stopping simulation.")
                 break
+    env.close()           
 
-    # ──────────────────────────────────────────────────────────────
-    # 6. CSV 保存
-    # ──────────────────────────────────────────────────────────────
-    env.close()             # 片付け
-
-    # フラット化して書き出し
     out_path = Path("teslabot_pos_100env_walking_mode.csv")
     with out_path.open("w", newline="") as f:
         writer = csv.writer(f)
@@ -270,7 +223,6 @@ def main(policy_wk, policy_wh):
         f"(total rows = {sum(len(v) for v in log_rows.values())})")
 
 if __name__ == "__main__":
-    # run the main function
     SCRIPT_FILE = Path(__file__).resolve()
     SCRIPT_DIR  = SCRIPT_FILE.parent
     # policy_wk = load_policy_torch(f"{SCRIPT_DIR}\models\distilled_policy_wk_jit.pt")

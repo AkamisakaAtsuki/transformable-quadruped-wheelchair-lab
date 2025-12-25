@@ -13,7 +13,6 @@ from isaaclab.app import AppLauncher
 
 import cli_args
 
-# add argparse arguments
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
@@ -30,19 +29,14 @@ parser.add_argument(
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
 cli_args.add_rsl_rl_args(parser)
-# append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.task = "TQW-Two-Modes-Normal-v0"
-# always enable cameras to record video
 if args_cli.video:
     args_cli.enable_cameras = True
 
-# launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
-
-"""Rest everything follows."""
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -68,13 +62,6 @@ from isaaclab.utils.assets import retrieve_file_path
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
 
-# from isaaclab_rl.rsl_rl import (
-#     RslRlOnPolicyRunnerCfg,
-#     RslRlOnPolicyRunner,
-#     RslRlVecEnvWrapper,
-#     export_policy_as_jit, 
-#     export_policy_as_onnx,
-# )
 from isaaclab_rl.rsl_rl import (
     RslRlOnPolicyRunnerCfg, 
     RslRlVecEnvWrapper
@@ -133,7 +120,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.events.apply_action.params["scale"] = 1.0
     env_cfg.scene.num_envs = 128
 
-    # agent_cfg = RslRlOnPolicyRunnerCfg() 
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     agent_cfg.max_iterations = (
         args_cli.max_iterations if args_cli.max_iterations is not None else agent_cfg.max_iterations
@@ -142,10 +128,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.seed = agent_cfg.seed
     env_cfg.sim.device = device
 
-    # agent_cfg.ppo_actor_critic.class_name     = "JITActorCritic"
-    # agent_cfg.ppo_actor_critic.init_noise_std = 0.1
-    # agent_cfg.ppo_actor_critic.noise_std_type = "scalar"
-
     env = gym.make(
         args_cli.task, 
         cfg=env_cfg, 
@@ -153,7 +135,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     )    
 
     agent_cfg.experiment_name = "distill_additional_learning"
-    # specify directory for logging experiments
     log_root_path = os.path.join(
         "logs", 
         "rsl_rl", 
@@ -161,9 +142,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     )
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
-    # specify directory for logging runs: {time-stamp}_{run_name}
     log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # This way, the Ray Tune workflow can extract experiment name.
     print(f"Exact experiment name requested from command line: {log_dir}")
     if agent_cfg.run_name:
         log_dir += f"_{agent_cfg.run_name}"
@@ -192,7 +171,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         torch.tensor(teacher_std_np, device=args_cli.device)
     )
 
-    # create runner from rsl-rl
     runner = CustomNetworkOnPolicyRunner(
         env, 
         agent_cfg.to_dict(), 
@@ -203,34 +181,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         noise_std_param = noise_std_param,
     )
 
-    # write git state to logs
     runner.add_git_repo_to_log(__file__)
     
-
-    # cfg: RslRlOnPolicyRunnerCfg = RslRlOnPolicyRunnerCfg()
-    # cfg.runner.device = device
-
-    # 通常の実行
-    # obs, _ = env.reset()
-    # timestep = 0
-    # dt = 0.02
-
-    # while simulation_app.is_running():
-    #     t0 = time.time()
-        
-    #     # run everything in inference mode
-    #     with torch.inference_mode():
-    #         try:
-    #             actions, _ = policy(obs['policy'])
-    #         except:
-    #             actions = policy(obs['policy'])
-    #         obs, _, _, _, _ = env.step(actions) 
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
     env.close()
 
 
 if __name__ == "__main__":
-    # run the main function
     main()
     simulation_app.close()

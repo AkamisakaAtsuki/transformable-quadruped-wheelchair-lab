@@ -3,15 +3,10 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to play a checkpoint if an RL agent from RSL-RL."""
-
-"""Launch Isaac Sim Simulator first."""
-
 import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
 parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
@@ -26,19 +21,14 @@ parser.add_argument(
     help="Use the pre-trained checkpoint from Nucleus.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
-# append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.task = "TQW-Change-Mode-Rule-v0"
-# always enable cameras to record video
 if args_cli.video:
     args_cli.enable_cameras = True
 
-# launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
-
-"""Rest everything follows."""
 
 import os
 import time
@@ -59,15 +49,6 @@ from isaaclab.utils.dict import print_dict
 from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
 
 import numpy as np
-# from isaaclab.sim import set_camera_view 
-
-# from isaaclab_rl.rsl_rl import (
-#     RslRlOnPolicyRunnerCfg,
-#     RslRlOnPolicyRunner,
-#     RslRlVecEnvWrapper,
-#     export_policy_as_jit, 
-#     export_policy_as_onnx,
-# )
 
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
@@ -96,7 +77,6 @@ from transformable_quadruped_wheelchair_isaaclab.envs.utils.utils import (
     action_idx
 )
 
-
 def load_joint_meta():
     current_file = os.path.abspath(__file__)
     base_dir = os.path.dirname(current_file)
@@ -114,36 +94,23 @@ def load_joint_meta():
     
     return joint_index_map_data, walking_joints_data, wheeled_joints_data
 
-# ------------- ブレンド設定 -------------
-dwell_time = 5.0    # 各モード（A, B）を純粋に維持する時間（秒）
-blend_time = 3.0    # モード切り替え時にブレンドする時間（秒）
-cycle_time = 2 * dwell_time + 2 * blend_time  # =16秒
+dwell_time = 5.0  
+blend_time = 3.0  
+cycle_time = 2 * dwell_time + 2 * blend_time  
 
 def compute_mu(cycle_pos: float) -> float:
     global dwell_time, blend_time, cycle_time
-    """
-    cycle_pos が [0, cycle_time) の範囲で与えられている前提。
-    「A(5s) -> blend A->B(3s) -> B(5s) -> blend B->A(3s)」を線形に補完して μ を返す
-    μ=1 なら pure A (combined_actions_wk)、μ=0 なら pure B (combined_actions_wh)
-    """
-    # ① [0, dwell_time): 純粋に A (μ=1)
     if cycle_pos < dwell_time:
         return 1.0
 
-    # ② [dwell_time, dwell_time + blend_time): A->B ブレンド区間
     if cycle_pos < dwell_time + blend_time:
         t_rel = cycle_pos - dwell_time  # 0 <= t_rel < blend_time
-        # 線形: t_rel=0 → μ=1, t_rel=blend_time → μ=0
         return 1.0 - (t_rel / blend_time)
 
-    # ③ [dwell_time+blend_time, dwell_time+blend_time+dwell_time): 純粋に B (μ=0)
     if cycle_pos < 2 * dwell_time + blend_time:
         return 0.0
 
-    # ④ [2*dwell_time + blend_time, cycle_time): B->A ブレンド区間
-    #    cycle_pos はここで 2*dwell_time+blend_time <= cycle_pos < cycle_time
     t_rel = cycle_pos - (2 * dwell_time + blend_time)  # 0 <= t_rel < blend_time
-    # 線形: t_rel=0 → μ=0, t_rel=blend_time → μ=1
     return t_rel / blend_time
 
 def main(merged_policy):
@@ -194,7 +161,6 @@ def main(merged_policy):
     else:
         dt = 0.02
 
-    # 2) 各 env のエピソード内ステップカウンタ
     episode_steps = torch.zeros(env_cfg.scene.num_envs, dtype=torch.long, device="cpu")
     
     THRESH = 5.0
@@ -223,8 +189,6 @@ def main(merged_policy):
                 obs_policy[:, -1] = 1.0
 
             mode_mask = (obs_policy[:, -2] > 0.5) & (obs_policy[:, -1] < 0.5)
-            # obs_policy[:, 9:12] *= 2.0 # wkとwhの速さを2倍
-            # obs_policy[mode_mask, 9:12] *= 2.0 # whのみ速さを2倍
 
             actions = merged_policy(obs_policy) 
             obs, r, term, trunc, infos = env.step(actions)
@@ -236,9 +200,7 @@ def main(merged_policy):
             TARGET_OFFSET  = torch.tensor([0.0, 0.0, -0.0], device=root_pos.device)  # 50 cm 下
 
             cam_eye    = root_pos + EYE_OFFSET
-            cam_target = root_pos + TARGET_OFFSET
-
-            # sim.set_camera_view(cam_eye.tolist(), cam_target.tolist())  
+            cam_target = root_pos + TARGET_OFFSET 
 
             done_mask = (term | trunc).cpu().numpy()
             for idx in np.nonzero(done_mask)[0]:
@@ -246,52 +208,42 @@ def main(merged_policy):
                 steps = int(episode_steps[idx].item())                 # ステップ数
                 elapsed_time = steps * dt                              # 経過秒
 
-                # ---------- ★ 追跡ロジック ----------
-                # まだ未登録なら判定
                 if idx not in results:
-                    # 最初の記録が負の Δy ならスキップして次を待つ
                     if dy < 0.0:
                         start_y[idx]      = current_y[idx]
                         episode_steps[idx] = 0
                         continue
 
-                    # 正値なら確定登録
                     results[idx] = dict(
                         delta_y=dy,
                         elapsed_time=elapsed_time if dy > GOAL_THRESH else "",
                         goal=dy > GOAL_THRESH,
                     )
-                # ------------------------------------
 
-                # 既存の処理（印字など）はそのまま
                 if dy > GOAL_THRESH:
                     print(f"[Env {idx}] GOAL! Δy : {dy:+.2f} m | time : {elapsed_time:.2f} s | steps : {steps}")
                 else:
                     print(f"[Env {idx}] Δy : {dy:+.2f} m")
 
-                # 次エピソード用にリセット
                 start_y[idx]       = current_y[idx]
                 episode_steps[idx] = 0
 
             if len(results) == num_envs:
-                sim_running = False          # ★ Isaac Sim を止める合図
+                sim_running = False         
                 break
 
     env.close()
 
-    # ========= 集計 =========
     delta_all    = [r["delta_y"] for r in results.values()]
     goal_times   = [r["elapsed_time"] for r in results.values() if r["goal"]]
     avg_delta    = np.mean(delta_all) if delta_all else 0.0
     avg_goal_t   = np.mean(goal_times) if goal_times else 0.0
     goal_ratio   = len(goal_times) / num_envs
 
-    # ========= CSV =========
     with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["env_id", "delta_y", "elapsed_time", "goal"])  # ヘッダ
 
-        # 0 → num_envs-1 の順で並べる
         for env_id in range(num_envs):
             row = results.get(env_id, {"delta_y": "", "elapsed_time": "", "goal": ""})
             writer.writerow([env_id, row["delta_y"], row["elapsed_time"], row["goal"]])
@@ -304,7 +256,6 @@ def main(merged_policy):
     print(f"[INFO] 結果を {CSV_PATH} に保存しました。")
 
 if __name__ == "__main__":
-    # run the main function
     SCRIPT_FILE = Path(__file__).resolve()
     SCRIPT_DIR  = SCRIPT_FILE.parent
     merged_policy = load_policy_torch(f"{SCRIPT_DIR}\models\walking_and_wheeled_mode_with_mode_vec_20250629.pt")

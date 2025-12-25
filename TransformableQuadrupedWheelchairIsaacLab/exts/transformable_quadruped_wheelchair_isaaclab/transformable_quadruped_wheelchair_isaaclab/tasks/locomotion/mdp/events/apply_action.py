@@ -41,10 +41,8 @@ j_wh_pos_idx = None
 j_wh_vel_idx = None
 j_wh_pos_offset = None
 
-# apply_predefined_joint_angle を置き換え
 _predefined_cache: dict[tuple[str, ...], tuple[torch.Tensor, torch.Tensor]] = {}
 
-# apply_predefined_joint_angle
 j_pre_idx = None
 j_pre_target = None
 
@@ -91,14 +89,6 @@ def apply_action(
 
     action_raw = env.action_manager.action[env_ids]
 
-    # joint_names = asset.joint_names
-    # idx_tmp = []
-    # idx_tmp.append(joint_names.index('FL_calf_joint'))
-    # idx_tmp.append(joint_names.index('FR_calf_joint'))
-    # idx_tmp.append(joint_names.index('RL_calf_joint'))
-    # idx_tmp.append(joint_names.index('RR_calf_joint'))
-    # action_raw[:, idx_tmp] = -2.0
-
     asset.set_joint_position_target(
         env_ids=env_ids,
         joint_ids=j_pos_idx,
@@ -117,12 +107,12 @@ def apply_predefined_joint_angle(
     t_joint_angles: list[float],
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ):
-    # キャッシュキーとして関節名タプルを作成
+  
     key = tuple(t_joint_names)
     if key not in _predefined_cache:
         asset: Articulation = env.scene[asset_cfg.name]
         joint_names = asset.joint_names
-        # インデックスとターゲットテンソルを作る
+        
         idxs = [joint_names.index(n) for n in t_joint_names]
         idx_tensor = torch.tensor(idxs, dtype=torch.long, device=env.device)
         target_tensor = torch.tensor(t_joint_angles, dtype=torch.float, device=env.device)
@@ -136,7 +126,7 @@ def apply_predefined_joint_angle(
         target=target_tensor,
     )
 
-def apply_action_16_only(  # 16個の制御対象ジョイントに特化した関数
+def apply_action_16_only(  
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
     joint_pos_control: List,
@@ -174,8 +164,6 @@ def apply_action_16_only(  # 16個の制御対象ジョイントに特化した�
 
     action_raw = env.action_manager.action[env_ids]
 
-    # print(j_16_pos_idx)
-
     asset.set_joint_position_target(
         env_ids=env_ids,
         joint_ids=j_16_pos_idx,
@@ -188,7 +176,7 @@ def apply_action_16_only(  # 16個の制御対象ジョイントに特化した�
     )
 
 
-def apply_action_wk_mode(  # 16個の制御対象ジョイントに特化した関数
+def apply_action_wk_mode( 
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
     joint_pos_control: List,
@@ -226,13 +214,8 @@ def apply_action_wk_mode(  # 16個の制御対象ジョイントに特化した�
         joint_ids=j_wk_pos_idx,
         target=action_raw * scale + j_wk_pos_offset[:, j_wk_pos_idx],
     )
-    # asset.set_joint_velocity_target(
-    #     env_ids=env_ids,
-    #     joint_ids=j_16_vel_idx, 
-    #     target=0, 
-    # )
-
-def apply_action_wh_mode(  # 16個の制御対象ジョイントに特化した関数
+ 
+def apply_action_wh_mode( 
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
     joint_pos_control: List,
@@ -259,9 +242,6 @@ def apply_action_wh_mode(  # 16個の制御対象ジョイントに特化した�
             j_wh_pos_idx.append(idx)
 
             j_wh_pos_offset[:, idx] = torch.tensor(joint_offset[joint_name], dtype=torch.float)
-        
-        # print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        # print(len(j_wh_pos_idx))
         
         for joint_name in joint_vel_control:
             j_wh_vel_idx.append(joint_names.index(joint_name))

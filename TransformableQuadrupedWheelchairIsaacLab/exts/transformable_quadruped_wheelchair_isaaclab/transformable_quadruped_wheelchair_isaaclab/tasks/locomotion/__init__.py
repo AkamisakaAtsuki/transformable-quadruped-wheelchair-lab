@@ -16,7 +16,6 @@ from . import two_modes_env_cfg
 # Register Gym environments.
 ##
 
-
 # walking mode rl env
 gym.register(
     id="TQW-Walking-Mode-Rl-v0",
@@ -57,10 +56,6 @@ gym.register(
     },
 )
 
-# walking mode collect data env
-
-# wheel mode collect data env
-
 # mode change rule env 
 gym.register(
     id="TQW-Change-Mode-Rule-v0",
@@ -81,9 +76,6 @@ gym.register(
         "sb3_cfg_entry_point":  f"{agents.__name__}:sb3_mode_change_rule.yaml",
     },
 )
-
-# mode change rl env
-
 
 # two modes rl env
 gym.register(

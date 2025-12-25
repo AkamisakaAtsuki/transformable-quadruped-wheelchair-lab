@@ -60,34 +60,16 @@ def four_wheel_independent_steering(
     mode_num: float = None, # モードフラグを使用する場合に検出するフラグとなる数字は何かを指定
     debug_mode: bool = False,
 ):
-    """
-    四輪独立操舵の制御情報を取得し、各ステアとホイールの角度をバッチ処理で管理する関数。
-    use_learned_model=Trueの場合は学習済みモデルを用いたアクション推論を行い、
-    Falseの場合は従来のMDPベースの処理を行います。
-    
-    Args:
-        env (ManagerBasedEnv): 環境インスタンス。
-        env_ids (torch.Tensor): 環境IDのリスト。
-        joint_offsets (Dict[str, float]): 各ジョイントのオフセット。
-        joint_pos_to_fix (Dict[str, float]): 固定すべきジョイントの角度設定。
-        *_steer (str): 各ステアジョイント名。
-        *_wheel (str): 各ホイールジョイント名。
-        use_learned_model (bool): 学習済みモデルを使うかどうかのフラグ。
-        debug_mode (bool): デバッグモードフラグ。
-    """
+   
     global previous_actions_wheel_mode, actions_change_mode, device, INIT_FLAG
 
-    # print("==========")
-    # print(env_ids)
-    # print_mode()        
-    # print(current_mode)
 
     _stop = get_stop()
     
     if debug_mode==False and use_mode_flag==True:
         _mode = get_mode()
         valid_env_ids = torch.where(_mode == mode_num)[0]
-        # モードはtorch.tensorの形であり、_modeの中の値がmode_numとなっている部分のインデックスのリストを取得（torch.tensor型で）
+        
     else:
         valid_env_ids = env_ids
     
@@ -132,7 +114,7 @@ def four_wheel_independent_steering(
     
 
     if use_learned_model:
-        # 学習済みモデルを使う場合とそうでない場合で観測データの調整・アクション取得処理を分岐
+        
         try:
             observations = env.observation_manager.compute()
             current_observations = torch.tensor(
@@ -142,7 +124,7 @@ def four_wheel_independent_steering(
             print(f"[Error] Failed to get observations: {e}")
             return
 
-        # 観測データを取得
+       
         try:
             observations = env.observation_manager.compute()
             current_observations = torch.tensor(
@@ -154,9 +136,9 @@ def four_wheel_independent_steering(
                 action_end_idx = action_start_idx + 1 
 
                 current_observations = torch.cat([
-                    current_observations[:, :action_start_idx],  # actions手前まで
-                    previous_actions_wheel_mode,  # (8,) の actions
-                    current_observations[:, action_end_idx:]  # actions 以降
+                    current_observations[:, :action_start_idx],  
+                    previous_actions_wheel_mode, 
+                    current_observations[:, action_end_idx:] 
                 ], dim=1)
             else:
                 print(f"[Error] Unexpected observation shape: {current_observations.shape}")
@@ -165,7 +147,6 @@ def four_wheel_independent_steering(
             print(f"[Error] Failed to get observations: {e}")
             return
 
-        # 学習済みモデルからアクション取得
         try:
             with torch.no_grad():
                 actions = wheel_mode_policy(current_observations).to(device) 
@@ -175,7 +156,6 @@ def four_wheel_independent_steering(
             print(e)
             return
 
-        # 対象ジョイント名とインデックス
         target_joint_names = [
             "FL_hip_joint", "FR_hip_joint", "RL_hip_joint", "RR_hip_joint",
             "FL_thigh_joint", "FR_thigh_joint", "RL_thigh_joint", "RR_thigh_joint"
@@ -187,13 +167,10 @@ def four_wheel_independent_steering(
         )
         adjusted_actions = actions_steering[valid_env_ids] * wheel_mode_policy_action_scale + offsets_tensor.unsqueeze(0)
 
-        # ジョイントターゲットの統合
         all_joint_indices = torch.cat([steer_joint_indices, torch.tensor(joint_indices, device=device)])
         all_targets = torch.cat([angle, adjusted_actions], dim=1)
 
-        # 目標値の適用
         asset.set_joint_position_target(
-            # target=(1 - _stop[valid_env_ids]) * all_targets, 
             target=all_targets, 
             joint_ids=all_joint_indices, 
             env_ids=valid_env_ids
@@ -201,12 +178,10 @@ def four_wheel_independent_steering(
         wheel_speeds_adj = wheel_speeds + actions_wheel[valid_env_ids] * 0.25
         asset.set_joint_velocity_target(
             target=wheel_speeds_adj * 55, 
-            # target=(1 - _stop[valid_env_ids]) * wheel_speeds_adj * 55, 
             joint_ids=wheel_joint_indices, 
             env_ids=valid_env_ids
         )
     elif learning_model:
-        # 観測データを取得
         try:
             observations = env.observation_manager.compute()
             current_observations = torch.tensor(
@@ -214,7 +189,6 @@ def four_wheel_independent_steering(
             ).clone().detach()
             
             if current_observations.shape[1] == 255:
-                # actions (Index 6) を置き換え
                 action_start_idx = sum([3, 3, 3, 3, 16, 28, 8])  
                 action_end_idx = action_start_idx + 4 
 
@@ -226,7 +200,6 @@ def four_wheel_independent_steering(
             print(f"[Error] Failed to get observations: {e}")
             return
         
-        # ステア角度とホイール速度を設定
         asset.set_joint_position_target(
             target=angle, 
             joint_ids=steer_joint_indices,
@@ -242,11 +215,7 @@ def four_wheel_independent_steering(
         )
 
     else:
-        # valid_env_ids = env_ids  # 全環境対象（または条件に合わせて選別）
-        # if valid_env_ids.numel() == 0:
-        #     print("[INFO] No environments met the condition for non-learned model control.")
-        #     return
-
+        
         asset.set_joint_position_target(
             target=angle, 
             joint_ids=steer_joint_indices, 
@@ -258,6 +227,5 @@ def four_wheel_independent_steering(
             env_ids=valid_env_ids
         )
 
-    # 固定ジョイントがある場合の処理
     if joint_pos_to_fix:
         set_joint_angles(env, valid_env_ids, asset_cfg, joint_pos_to_fix)

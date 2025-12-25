@@ -29,33 +29,6 @@ class QuadrupedWheelchairTwoModesChangeEventCfg(QuadrupedWheelchairTwoModesEvent
         mode="reset",
     )
 
-    # # interval
-    # apply_walking_policy = EventTerm(
-    #     func=walking_mode_events.apply_walking_policy,
-    #     mode="interval",
-    #     interval_range_s=(0.02, 0.02),  # environment step size: 0.02
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot")
-    #     },
-    # )
-
-    # four_wheel_independent_steering = EventTerm(
-    #     func=wheel_mode_events.four_wheel_independent_steering,
-    #     mode="interval",
-    #     interval_range_s=(0.02, 0.02),
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot"),
-    #         "front_left_steer": 'LFUpper2_joint',
-    #         "front_right_steer": 'RFUpper2_joint',
-    #         "rear_left_steer": 'LRUpper2_joint',
-    #         "rear_right_steer": 'RRUpper2_joint',
-    #         "front_left_wheel": 'LFTire1_joint',
-    #         "front_right_wheel": 'RFTire1_joint',
-    #         "rear_left_wheel": 'LRTire1_joint',
-    #         "rear_right_wheel": 'RRTire1_joint',
-    #     },
-    # )
-
     change_mode_events = EventTerm(
         func=change_mode_events.change_mode_rule,
         mode="interval",
@@ -73,13 +46,11 @@ class QuadrupedWheelchairTwoModesChangeEventCfg(QuadrupedWheelchairTwoModesEvent
 class CommandsCfg:
     """Command specifications for the MDP."""
     
-    # 新たにゴール追従用のコマンドを追加
     base_velocity = quadruped_wheelchair_mdp.GoalTrackingCommandCfg(
         asset_name="robot",
         debug_vis=True,
-        # 各カリキュラムにおけるゴール位置（例として下記のテンソルを与える）
         goal_positions=[
-            [-36.0,  36.0,  0.1225], # もともとはy=28
+            [-36.0,  36.0,  0.1225],
             [-28.0,  36.0,  0.15817],
             [-20.0,  36.0,  0.24731],
             [-12.0,  36.0,  0.30337],
@@ -90,8 +61,8 @@ class CommandsCfg:
             [ 28.0,  36.0,  0.76092],
             [ 36.0,  36.0,  0.76487]
         ],
-        gain=1.0,        # 差分に対する比例ゲイン（必要に応じて調整）
-        max_speed=1.0,   # 各軸の最大速度（m/s）
+        gain=1.0,     
+        max_speed=1.0, 
         resampling_time_range=(0.1, 0.1)
     )
 
@@ -116,20 +87,19 @@ class QuadrupedWheelchairTwoModesChangeEnv_Normal_Cfg(QuadrupedWheelchairTwoMode
                     return
                 super().__setattr__(name, value)
 
-        # GoalTrackingCommandCfg に元々無い ranges を一時的に差し替え
+       
         self.commands.base_velocity.ranges = NoOpRanges()
 
-        # ─── ② あとはそのまま親の __post_init__ を呼ぶ ───────────────────
+      
         super().__post_init__()
 
-        # ─── ③ （必要なら）もう dummy ranges は不要なので消しておく ─────────
         delattr(self.commands.base_velocity, "ranges")
 
         self.episode_length_s = 75
         print(f"self.episode_length_s: {self.episode_length_s}")
 
         self.scene.terrain.terrain_generator = MODE_CHANGE_TERRAINS_CFG
-        # slopeは平坦にする
+       
         self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope"].slope_range = (0, 0)
         self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope_inv"].slope_range = (0, 0)
         self.scene.terrain.terrain_generator.sub_terrains["hf_pyramid_slope_2"].slope_range = (0, 0)
@@ -140,9 +110,6 @@ class QuadrupedWheelchairTwoModesChangeEnv_Normal_Cfg(QuadrupedWheelchairTwoMode
         self.scene.terrain.max_init_terrain_level = 9
 
         DEBUG_WALKING_MODE = None
-
-        # self.scene.robot.init_state.joint_pos['slider_joint'] = 0.325 # 歩行移動を学習したときのオフセットに設定する！（こうしないとうまくいかない）
-        # print(f"[DEBUG] scene.robot.init_state.joint_pos: {self.scene.robot.init_state.joint_pos}")
 
         if getattr(self.curriculum, "terrain_levels", None) is not None:
             if self.scene.terrain.terrain_generator is not None:
@@ -164,13 +131,11 @@ class QuadrupedWheelchairTwoModesChangeEnv_Normal_Cfg_PLAY(QuadrupedWheelchairTw
                     return
                 super().__setattr__(name, value)
 
-        # GoalTrackingCommandCfg に元々無い ranges を一時的に差し替え
+      
         self.commands.base_velocity.ranges = NoOpRanges()
 
-        # ─── ② あとはそのまま親の __post_init__ を呼ぶ ───────────────────
         super().__post_init__()
 
-        # ─── ③ （必要なら）もう dummy ranges は不要なので消しておく ─────────
         delattr(self.commands.base_velocity, "ranges")
 
         # make a smaller scene for play
