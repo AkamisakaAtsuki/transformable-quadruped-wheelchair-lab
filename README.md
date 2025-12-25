@@ -15,7 +15,9 @@ https://github.com/user-attachments/assets/c5e4a9cc-27c5-4767-8748-49305b8ebba3
 ```bash
 git clone https://github.com/AkamisakaAtsuki/transformable-quadruped-wheelchair-lab.git
 cd transformable-quadruped-wheelchair-lab/TransformableQuadrupedWheelchairIsaacLab
-python -m pip install -e exts/transformable_quadruped_wheelchair_isaaclab
+# python -m pip install -e exts/transformable_quadruped_wheelchair_isaaclab
+python -m pip install -e exts/transformable_quadruped_wheelchair_isaaclab --no-build-isolation
+
 ```
 Note: NVIDIA Isaac Lab must be installed in advance.
 
@@ -91,3 +93,4 @@ This evaluation collects metrics such as:
 - Time to reach the goal
 
 - Goal completion success
+
