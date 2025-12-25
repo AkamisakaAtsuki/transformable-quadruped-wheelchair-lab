@@ -76,37 +76,17 @@ def main():
 
     agent_cfg: RslRlOnPolicyRunnerCfg = cli_args.parse_rsl_rl_cfg(args_cli.task, args_cli)
 
-    # # specify directory for logging experiments
-    # log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
-    # log_root_path = os.path.abspath(log_root_path)
-    # print(f"[INFO] Loading experiment from directory: {log_root_path}")
-    # if args_cli.use_pretrained_checkpoint:
-    #     resume_path = get_published_pretrained_checkpoint("rsl_rl", args_cli.task)
-    #     if not resume_path:
-    #         print("[INFO] Unfortunately a pre-trained checkpoint is currently unavailable for this task.")
-    #         return
-    # elif args_cli.checkpoint:
-    #     resume_path = retrieve_file_path(args_cli.checkpoint)
-    # else:
-    #     resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
-
-    # log_dir = os.path.dirname(resume_path)
-
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env)
 
-    # print(f"[INFO]: Loading model checkpoint from: {resume_path}")
-    # load previously trained model
     ppo_runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
     ppo_runner.load("C:/Users/admin5050/Downloads/wm_pt/model_99999.pt")
 
-    # obtain the trained policy for inference
     policy = ppo_runner.get_inference_policy(device=env.unwrapped.device)
 
-    # オリジナルの actor-critic モデルを取り出す
     actor_critic = ppo_runner.alg.actor_critic
     
     try:
@@ -115,14 +95,6 @@ def main():
     except:
         pass
 
-    # actor の std（もしくは log_std）パラメータを取得
-    # モデルによって名前が異なりますが、多くは `actor.std` または `actor.log_std` です
-           # もし std なら
-    # log_std の場合は exp して std に変換
-    # std_param = actor_critic.actor.log_std.exp()
-
-
-    # close the simulator
     env.close()
 
 

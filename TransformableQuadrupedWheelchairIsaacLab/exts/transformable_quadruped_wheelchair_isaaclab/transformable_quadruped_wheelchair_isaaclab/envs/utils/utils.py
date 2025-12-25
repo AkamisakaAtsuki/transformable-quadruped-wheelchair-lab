@@ -1,31 +1,3 @@
-# import gymnasium as gym
-# import os
-# from pathlib import Path
-# import time
-
-
-# from rsl_rl.runners import OnPolicyRunner
-
-# from isaaclab.managers import SceneEntityCfg
-# from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
-# from isaaclab.utils.assets import retrieve_file_path
-# from isaaclab.utils.dict import print_dict
-# from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
-
-# from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, export_policy_as_jit, export_policy_as_onnx
-
-# import isaaclab_tasks  # noqa: F401
-# from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
-
-# import transformable_quadruped_wheelchair_isaaclab.tasks.locomotion
-# from transformable_quadruped_wheelchair_isaaclab.tasks.locomotion.two_modes_env_cfg import (
-#     DEFAULT_ACTION_JOINTS_VEL,
-#     WALKING_ACTION_JOINTS_POS,
-#     WALKING_OFFSET,
-#     WALKING_MODE_PREFERRED_ANGLES
-# )
-# from transformable_quadruped_wheelchair_isaaclab.envs.gym_wrappers.save_trajectory import MultiEnvDistillWrapper
-
 import torch
 from isaaclab.assets import Articulation
 
@@ -42,10 +14,7 @@ def post_process_walking_mode():
     pass
 
 def unwrap_env(env):
-    """OrderEnforcing などのラッパーを全部剥がして、本丸の ManagerBasedEnv を返す"""
-    # Gymnasium の env.unwrapped が使えない場合もあるので自前でやる
     raw = env
-    # たとえば: OrderEnforcing → TimeLimit → … → ManagerBasedEnv
     while hasattr(raw, "env"):
         raw = raw.env
     return raw
