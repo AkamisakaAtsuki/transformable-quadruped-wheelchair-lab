@@ -7,8 +7,8 @@ import gymnasium as gym
 
 from . import agents
 # from . flat_env_cfg, rough_env_cfg, mode_change_env_cfg
-from . import walking_mode_rl_env_cfg, walking_mode_collect_data_env_cfg
-from . import wheel_mode_rl_env_cfg, wheel_mode_collect_data_env_cfg
+from . import walking_mode_rl_env_cfg
+from . import wheel_mode_rl_env_cfg
 from . import two_modes_change_env_cfg
 from . import two_modes_env_cfg
 
