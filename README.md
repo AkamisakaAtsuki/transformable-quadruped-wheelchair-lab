@@ -27,12 +27,12 @@ In this study, walking mode and wheeled mode are trained independently, as their
 
 ### Walking Mode Training
 ```bash
-python IsaacLab\scripts\reinforcement_learning\rsl_rl\train.py --task TQW-Walking-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
+python IsaacLab/scripts/reinforcement_learning/rsl_rl/train.py --task TQW-Walking-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
 ```
 
 ### Wheeled Mode Training
 ```bash
-python IsaacLab\scripts\reinforcement_learning\rsl_rl\train.py --task TQW-Wheel-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
+python IsaacLab/scripts/reinforcement_learning/rsl_rl/train.py --task TQW-Wheel-Mode-Rl-v0 --num_envs 2048 --max_iteration 20000
 ```
 
 ## Vibration (Sway) Analysis
@@ -84,7 +84,8 @@ A dedicated long-distance evaluation environment with explicit mode switching is
 Run the following command to evaluate the distilled policy:
 
 ```bash
-python IsaacLab\scripts\reinforcement_learning\rsl_rl\play.py --task TQW-Two-Modes-with-ModeVector-v0 --num_envs 100
+# python IsaacLab/scripts/reinforcement_learning/rsl_rl/play.py --task TQW-Two-Modes-with-ModeVector-v0 --num_envs 100
+python transformable-quadruped-wheelchair-lab/TransformableQuadrupedWheelchairIsaacLab/exts/transformable_quadruped_wheelchair_isaaclab/transformable_quadruped_wheelchair_isaaclab/envs/run_wheeled_and_walking_policy_with_mode_vec_long_terrain.py
 ```
 
 This evaluation collects metrics such as:
@@ -93,4 +94,5 @@ This evaluation collects metrics such as:
 - Time to reach the goal
 
 - Goal completion success
+
 
